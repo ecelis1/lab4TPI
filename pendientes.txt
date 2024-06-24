@@ -1,0 +1,20 @@
+Faltan las validaciones de todo.
+Falta el front.
+
+
+
+1. Obtener la lista de eventos disponibles. ver error : 
+TypeError: Failed to execute 'fetch' on 'Window': Request with GET/HEAD method cannot have body.
+
+2. Buscar eventos por nombre o descripción. LISTO
+
+3. Obtener las inscripciones activas de un usuario.
+Ver de mejorar el tema de la fecha si realmente estan activas , ahora se muestran todas
+
+4. Obtener el historial de inscripciones de un usuario.LISTO
+
+5. Listar todos los eventos de una categoría específica. LISTO
+
+Nota: Tener en cuenta que existe un cupo por cada evento.
+Por lo tanto, en cada inscripción se deberá verificar
+previamente la disponibilidad del mismo. LISTO
