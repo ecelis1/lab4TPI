@@ -48,10 +48,11 @@ def get_Eventos(descripcion: str):
     return JSONResponse(status_code=200,content=jsonable_encoder(result))
 
 # # Obtener la lista de eventos disponibles.
-@eventos_router.get('/Eventos/disponibles', tags=['Eventos'], status_code=status.HTTP_200_OK,response_model=list[Eventos], dependencies=[Depends(get_current_user)])
-def get_Eventos(fecha : date=Form(...)):
+@eventos_router.get('/Eventos/disponibles/{fecha}', tags=['Eventos'], status_code=status.HTTP_200_OK,response_model=list[Eventos], dependencies=[Depends(get_current_user)])
+def get_Eventos(fecha : date):
     db=Session()
     result = EventoService(db).get_evento_disponibles(fecha)
+    print(result)
     if not result:
         raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail=f"Eventos no encontradas" )
     return JSONResponse(status_code=200,content=jsonable_encoder(result))

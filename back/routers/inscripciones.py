@@ -35,10 +35,10 @@ def new_inscripciones(evento_id:int=Form(...),usuario_id:int=Form(...),fecha_ins
     return JSONResponse(status_code=201, content={"message": "inscripciones registrada"})
 
 ## Obtener las inscripciones activas de un usuario.
-@inscripciones_router.get('/inscripciones/{usuario_id}', tags=['inscripciones'], status_code=status.HTTP_200_OK,response_model=list[Inscripciones], dependencies=[Depends(get_current_user)])
-def get_inscripciones(usuario_id: int):
+@inscripciones_router.get('/inscripciones/{fecha}', tags=['inscripciones'], status_code=status.HTTP_200_OK,response_model=list[Inscripciones], dependencies=[Depends(get_current_user)])
+def get_inscripciones(fecha: date):
     db=Session()
-    result = InscripcionesService(db).get_inscripciones_usuario(usuario_id)
+    result = InscripcionesService(db).get_inscripciones_usuario(fecha)
     if not result:
         raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail="inscripciones no encontradas" )
     return JSONResponse(status_code=200,content=jsonable_encoder(result))
