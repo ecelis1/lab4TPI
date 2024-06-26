@@ -4,6 +4,8 @@ from fastapi import HTTPException,status
 from sqlalchemy.exc import IntegrityError
 from services.categorias import CategoriaService
 from datetime import datetime, date
+from sqlalchemy.orm import Session,load_only,joinedload
+
 
 class EventoService():
     
@@ -58,8 +60,16 @@ class EventoService():
     
     ##Obtener la lista de eventos disponibles.
     def get_evento_disponibles(self, fecha: date):
-        result = self.db.query(Eventos).filter(Eventos.fecha_inicio >= fecha).all()
-        return result
+        result = self.db.query(EventosModel).options(load_only(EventosModel.id,EventosModel.fecha_fin,EventosModel.fecha_inicio,EventosModel.categoria_id,EventosModel.cupos,EventosModel.nombre,EventosModel.descripcion,EventosModel.lugar)).filter(EventosModel.fecha_inicio > fecha).all()
+        return [Eventos(**result.__dict__) for result in result]# Iteramos sobre los resultados obtenidos (results) y creamos una lista de objetos UsuarioBase utilizando los datos de cada objeto UsuarioModel.
+    
+    # result = self.db.query(inscripcionesModel).options(joinedload(inscripcionesModel.usuario)
+    #                         .load_only(
+
+    #                         ),
+    #                     load_only(inscripcionesModel.fecha_inscripcion)
+    #                 ).filter(inscripcionesModel.usuario_id == usuario_id).all()
+    #     return result
 
     ##Buscar eventos por nombre o descripción.
      

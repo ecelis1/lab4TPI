@@ -24,9 +24,9 @@ class InscripcionesService():
         return result
 
 ## falta ver el tema si estan activas estas inscripciones.
-    def get_inscripciones_usuario(self, usuario_id):
-        result = self.db.query(inscripcionesModel).filter(inscripcionesModel.usuario_id == usuario_id).all()
-        return result
+    def get_inscripciones_usuario(self, fecha):
+        result = self.db.query(inscripcionesModel).options(load_only(inscripcionesModel.id,inscripcionesModel.evento_id,inscripcionesModel.usuario_id,inscripcionesModel.fecha_inscripcion)).filter(EventosModel.fecha_inicio > fecha).all()
+        return [Inscripciones(**result.__dict__) for result in result]# Iteramos sobre los resultados obtenidos (results) y creamos una lista de objetos eventos utilizando los datos de cada objeto UsuarioModel.
 
     def get_inscripciones_history_usuario(self, usuario_id):
         result = self.db.query(inscripcionesModel).options(joinedload(inscripcionesModel.usuario)
