@@ -1,42 +1,69 @@
+
+from fastapi import APIRouter, status, Depends, Path, Query, File, Form
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.exceptions import HTTPException
+from fastapi.encoders import jsonable_encoder
+from typing import List, Literal
+from pydantic import EmailStr
+from schemas.usuarios import Usuario, UsuarioBase 
+from services.usuarios import UsuarioServ
+from config.database import Session
+from utils.jwt_manager import get_current_user
 from models.categorias import Categorias as CategoriaModel
 from schemas.categorias import Categoria
-from sqlalchemy.exc import IntegrityError
-from fastapi import HTTPException,status
-from sqlalchemy.orm import Session
-
-class CategoriaService():
-    
-    def __init__(self, db:Session) -> None:
-        self.db = db
-
-    def get_categoria(self):
-        result = self.db.query(CategoriaModel).all()
-        return [Categoria(**result.__dict__) for result in result]
-
-    def get_categoria_id(self, id):
-        result = self.db.query(CategoriaModel).filter(CategoriaModel.id == id).first()
-        return Categoria(**result.__dict__)
+from services.categorias import CategoriaService
 
 
-    def create_categoria(self, categoria: Categoria):
-        try:
-            new_categoria = CategoriaModel(**categoria.dict())
-            self.db.add(new_categoria)
-            self.db.commit()
-            return
-        except IntegrityError:
-            self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f'Error.')
- 
-    def update_categoria(self, id: int, data: Categoria):
-        categoria = self.db.query(CategoriaModel).filter(CategoriaModel.id == id).first()
-        categoria.descripcion = data.descripcion
-        self.db.commit()
-        return
+from config.database import Session
 
-    def delete_categoria(self, id: int):
-       result = self.db.query(CategoriaModel).filter(CategoriaModel.id == id).delete()
-       if not result:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"La categoria no existe.")
-       self.db.commit()
-       return
+Categoria_router = APIRouter()
+
+
+
+# CATEGORIA
+
+@Categoria_router.post('/categoria/', tags=['categoria'],status_code=status.HTTP_201_CREATED,response_model=list[Categoria], dependencies=[Depends(get_current_user)])
+def new_categoria(nombre:str=Form(...),descripcion:str=Form(...)):
+    categoria=Categoria(
+        id=None,
+        nombre=nombre,
+        descripcion=descripcion
+    )
+    db=Session()
+    CategoriaService(db).create_categoria(categoria)
+    return JSONResponse(status_code=201, content={"message": "categoria registrada"})
+
+@Categoria_router.get('/categoria/', tags=['categoria'], status_code=status.HTTP_200_OK,response_model=list[Categoria], dependencies=[Depends(get_current_user)])
+def get_categoria():
+    db=Session()
+    result = CategoriaService(db).get_categoria()
+    if not result:
+        raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail="No existen Categorias" )
+    return JSONResponse(status_code=200,content=jsonable_encoder(result))
+
+@Categoria_router.get('/categoria/{id}', tags=['categoria'], status_code=status.HTTP_200_OK,response_model=list[Categoria], dependencies=[Depends(get_current_user)])
+def get_categoria(id: int):
+    db=Session()
+    result = CategoriaService(db).get_categoria_id(id)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail="Categoria no encontrada" )
+    return JSONResponse(status_code=200,content=jsonable_encoder(result))
+
+	
+@Categoria_router.put('/categoria/{id}', tags=['categoria'], status_code=status.HTTP_200_OK,response_model=list[Categoria], dependencies=[Depends(get_current_user)])
+def update_categoria(id: int ,categoria : Categoria):
+     db=Session()
+     result=CategoriaService(db).get_categoria_id(id)
+     if not result:
+          raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail="categoria no existe." )
+     CategoriaService(db).update_categoria(id,categoria)
+     return JSONResponse(status_code=200,content={"Message":"categoria modificado correctamente"}) 
+
+
+
+@Categoria_router.delete('/categoria/{id}', tags=['categoria'], status_code=status.HTTP_200_OK,response_model=list[Categoria], dependencies=[Depends(get_current_user)])
+def delete_categoria(id: int): 
+    db=Session()
+    CategoriaService(db).delete_categoria(id)
+    return JSONResponse(status_code=200, content={"message": "categoria eliminada correctamente"})
+

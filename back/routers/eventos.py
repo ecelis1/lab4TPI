@@ -1,93 +1,102 @@
-from models.eventos import Eventos as EventosModel
-from schemas.eventos import Eventos
-from fastapi import HTTPException,status
-from sqlalchemy.exc import IntegrityError
-from services.categorias import CategoriaService
-from datetime import datetime, date
-from sqlalchemy.orm import Session,load_only,joinedload
+from fastapi import APIRouter, status, Depends, Path, Query, File, Form
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.exceptions import HTTPException
+from fastapi.encoders import jsonable_encoder
+from typing import List, Literal
+from pydantic import EmailStr
+from schemas.eventos import Eventos 
+from services.eventos import EventoService
+from config.database import Session
+from utils.jwt_manager import get_current_user
+from datetime import date
+
+eventos_router = APIRouter()
 
 
-class EventoService():
-    
-    def __init__(self, db) -> None:
-        self.db = db
+@eventos_router.post('/Eventos/', tags=['Eventos'],status_code=status.HTTP_201_CREATED,response_model=list[Eventos], dependencies=[Depends(get_current_user)])
+def new_Eventos(nombre:str=Form(...),descripcion:str=Form(...),fecha_inicio:date=Form(...),fecha_fin:date=Form(...),lugar:str=Form(...),cupos:int=Form(...),categoria_id:int=Form(...)):
+    evento=Eventos(
+        id=None,
+        nombre=nombre,
+        descripcion=descripcion,
+        fecha_inicio=fecha_inicio,
+        fecha_fin=fecha_fin,
+        lugar=lugar,
+        cupos=cupos,
+        categoria_id=categoria_id
+    )
+    db=Session()
+    print(evento.categoria_id)
+    EventoService(db).create_evento(evento)
+    return JSONResponse(status_code=201, content={"message": "Eventos registrada"})
+##Buscar eventos por nombre o descripción.
 
-    def get_evento(self):
-        
-        result = self.db.query(EventosModel).options(load_only(EventosModel.id,EventosModel.fecha_fin,EventosModel.fecha_inicio,EventosModel.categoria_id,EventosModel.cupos,EventosModel.nombre,EventosModel.descripcion,EventosModel.lugar)).all()
-        return [Eventos(**result.__dict__) for result in result]
+@eventos_router.get('/Eventos/{nombre}', tags=['Eventos'], status_code=status.HTTP_200_OK,response_model=list[Eventos], dependencies=[Depends(get_current_user)])
+def get_Eventos(nombre: str):
+    db=Session()
+    result = EventoService(db).get_evento_nombre(nombre)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail="nombre de Eventos no encontrada" )
+    return JSONResponse(status_code=200,content=jsonable_encoder(result))
 
-    def get_evento_id(self, id):
-        result = self.db.query(EventosModel).filter(EventosModel.id == id).first()
-        return result
+@eventos_router.get('/Eventos/{descripcion}', tags=['Eventos'], status_code=status.HTTP_200_OK,response_model=list[Eventos], dependencies=[Depends(get_current_user)])
+def get_Eventos(descripcion: str):
+    db=Session()
+    result = EventoService(db).get_evento_descripcion(descripcion)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail="Eventos no encontrada" )
+    return JSONResponse(status_code=200,content=jsonable_encoder(result))
 
-    def get_evento_by_category(self, evento):
-        result = self.db.query(EventosModel).filter(EventosModel.categoria_id == evento).all()
-        return result
+# # Obtener la lista de eventos disponibles.
+@eventos_router.get('/Eventos/disponibles/{fecha}', tags=['Eventos'], status_code=status.HTTP_200_OK,response_model=list[Eventos], dependencies=[Depends(get_current_user)])
+def get_Eventos(fecha : date):
+    db=Session()
+    result = EventoService(db).get_evento_disponibles(fecha)
+    print(result)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail=f"Eventos no encontradas" )
+    return JSONResponse(status_code=200,content=jsonable_encoder(result))
 
-    def create_evento(self, evento: Eventos):
-        try:
-            resultCategoria=CategoriaService(self.db).get_categoria_id(evento.categoria_id)
 
-            if resultCategoria == None :
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"La Categoria ingresada no es valida.")
-            
-            new_evento = EventosModel(**evento.dict())
-            self.db.add(new_evento)
-            self.db.commit()
-            return 
-        except IntegrityError:
-            self.db.rollback()
-            raise HTTPException(status_code=400, detail=f"Error.")    
-    
-    def update_evento(self, id: int, data: Eventos):
-        evento = self.db.query(EventosModel).filter(EventosModel.id == id).first()
-        evento.nombre = data.nombre
-        evento.descripcion = data.descripcion
-        evento.fecha_inicio = data.fecha_inicio
-        evento.fecha_fin = data.fecha_fin
-        evento.lugar = data.lugar
-        evento.cupos = data.cupos
-        evento.categoria_id = data.categoria_id
-        self.db.commit()
-        return
+@eventos_router.get('/Eventos/', tags=['Eventos'], status_code=status.HTTP_200_OK,response_model=list[Eventos], dependencies=[Depends(get_current_user)])
+def get_Eventos():
+    db=Session()
+    result = EventoService(db).get_evento()
+    if not result:
+        raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail="No hay Eventos" )
+    return JSONResponse(status_code=200,content=jsonable_encoder(result))
 
-    def delete_evento(self, id: int):
-       result =self.db.query(EventosModel).filter(EventosModel.id == id).delete()
-       if not result:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"La evento no existe.")
-       self.db.commit()
-       return
-    
-    ##Obtener la lista de eventos disponibles.
-    def get_evento_disponibles(self, fecha: date):
-        result = self.db.query(EventosModel).options(load_only(EventosModel.id,EventosModel.fecha_fin,EventosModel.fecha_inicio,EventosModel.categoria_id,EventosModel.cupos,EventosModel.nombre,EventosModel.descripcion,EventosModel.lugar)).filter(EventosModel.fecha_inicio > fecha).all()
-        return [Eventos(**result.__dict__) for result in result]# Iteramos sobre los resultados obtenidos (results) y creamos una lista de objetos UsuarioBase utilizando los datos de cada objeto UsuarioModel.
-    
-    # result = self.db.query(inscripcionesModel).options(joinedload(inscripcionesModel.usuario)
-    #                         .load_only(
+@eventos_router.get('/Eventos/{id}', tags=['Eventos'], status_code=status.HTTP_200_OK,response_model=list[Eventos], dependencies=[Depends(get_current_user)])
+def get_Eventos(id: int):
+    db=Session()
+    result = EventoService(db).get_evento_id(id)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail="Eventos no encontrada" )
+    return JSONResponse(status_code=200,content=jsonable_encoder(result))
 
-    #                         ),
-    #                     load_only(inscripcionesModel.fecha_inscripcion)
-    #                 ).filter(inscripcionesModel.usuario_id == usuario_id).all()
-    #     return result
+	
+@eventos_router.put('/Eventos/{id}', tags=['Eventos'], status_code=status.HTTP_200_OK,response_model=list[Eventos], dependencies=[Depends(get_current_user)])
+def update_Eventos(id: int ,evento : Eventos):
+     db=Session()
+     result=EventoService(db).get_evento_id(id)
+     if not result:
+          raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail="Eventos no existe." )
+     EventoService(db).update_evento(id,evento)
+     return JSONResponse(status_code=200,content={"Message":"Eventos modificado correctamente"}) 
 
-    ##Buscar eventos por nombre o descripción.
-     
-    def get_evento_nombre(self, nombre):
-        result = self.db.query(EventosModel).filter(EventosModel.nombre == nombre).first()
-        return result
-    
-    def get_evento_descripcion(self, descripcion):
-        result = self.db.query(EventosModel).filter(EventosModel.descripcion == descripcion).first()
-        return result
-    
-    def get_evento_cupos(self, evento_id: int):
-        evento = self.db.query(EventosModel).filter(EventosModel.id == evento_id).first()
-        return evento.cupos if evento else None
 
-    def set_eventos_cupos(self, evento_id: int, new_cupos: int):
-        evento = self.db.query(EventosModel).filter(EventosModel.id == evento_id).first()
-        if evento:
-            evento.cupos = new_cupos
-            self.db.commit()
+
+@eventos_router.delete('/Eventos/{id}', tags=['Eventos'], status_code=status.HTTP_200_OK,response_model=list[Eventos], dependencies=[Depends(get_current_user)])
+def delete_Eventos(id: int): 
+    db=Session()
+    EventoService(db).delete_evento(id)
+    return JSONResponse(status_code=200, content={"message": "Eventos eliminada correctamente"})
+
+@eventos_router.get('/Eventos/{categoria}', tags=['Eventos'], status_code=status.HTTP_200_OK,response_model=list[Eventos], dependencies=[Depends(get_current_user)])
+def get_Eventos(categoria: int):
+    db=Session()
+    result = EventoService(db).get_evento_by_category(categoria)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail="nombre de Eventos no encontrada" )
+    return JSONResponse(status_code=200,content=jsonable_encoder(result))
+
